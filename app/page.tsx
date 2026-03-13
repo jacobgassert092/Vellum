@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
-import { db } from "../lib/db"; 
-import { processEpub } from "../lib/epubprocessor";
+import { db } from "@/lib/db"; 
+import { processEpub } from "@/lib/epubprocessor";
 import Link from "next/link";
 
 export default function LibraryPage() {
@@ -12,10 +12,41 @@ export default function LibraryPage() {
 
   const handleDelete = async (id?: number) => {
     if (!id || !confirm("Delete this novel and all associated translations?")) return;
-    
     await db.novels.delete(id);
-    
     await db.translations.where("novelId").equals(id).delete();
+  };
+
+  const handleExport = async (novel: any) => {
+    if (!novel.completedChapters || novel.completedChapters.length === 0) {
+      alert("No completed chapters to export.");
+      return;
+    }
+    
+    const translations = await db.translations.where("novelId").equals(novel.id).toArray();
+    
+    let exportContent = `Title: ${novel.title}\n\n`;
+    let hasContent = false;
+
+    novel.completedChapters.forEach((href: string) => {
+      const t = translations.find(trans => trans.chapterHref === href);
+      if (t && t.content.trim()) {
+        exportContent += `\n\n--- ${href} ---\n\n${t.content}\n`;
+        hasContent = true;
+      }
+    });
+
+    if (!hasContent) {
+      alert("No translated text found in completed chapters.");
+      return;
+    }
+
+    const blob = new Blob([exportContent], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${novel.title} - Completed Translations.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -25,22 +56,15 @@ export default function LibraryPage() {
         <label className="cursor-pointer bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded text-[10px] font-black uppercase tracking-widest transition-colors">
           {importStatus || "+ Import EPUB"}
           <input 
-            type="file" 
-            accept=".epub" 
-            className="hidden" 
+            type="file" accept=".epub" className="hidden" 
             onChange={async (e) => {
               const file = e.target.files?.[0];
               if (file) {
                 setImportStatus("Importing...");
                 try {
                   const data = await processEpub(file);
-                  await db.novels.add({
-                    ...data,
-                    completedChapters: [] 
-                  });
-                } catch (err) {
-                  console.error("Import failed:", err);
-                }
+                  await db.novels.add({ ...data, completedChapters: [] });
+                } catch (err) { console.error("Import failed:", err); }
                 setImportStatus("");
               }
             }} 
@@ -58,48 +82,36 @@ export default function LibraryPage() {
 
             return (
               <div key={novel.id} className="group flex flex-col gap-3">
-                <Link 
-                  href={`/reader?id=${novel.id}${lastLoc}`}
-                  className="relative aspect-[2/3] bg-surface rounded border border-border overflow-hidden group-hover:border-blue-500/50 transition-all shadow-lg"
-                >
+                <Link href={`/reader?id=${novel.id}${lastLoc}`} className="relative aspect-[2/3] bg-surface rounded border border-border overflow-hidden group-hover:border-blue-500/50 transition-all shadow-lg">
                   {novel.coverImage ? (
-                    <img 
-                      src={novel.coverImage} 
-                      alt="" 
-                      className="object-cover w-full h-full opacity-70 group-hover:opacity-100 transition-opacity" 
-                    />
+                    <img src={novel.coverImage} alt="" className="object-cover w-full h-full opacity-70 group-hover:opacity-100 transition-opacity" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-[10px] font-black opacity-20 uppercase tracking-tighter">No Cover</div>
                   )}
-
                   {/* Progress Overlay */}
                   <div className="absolute bottom-0 left-0 right-0 p-3 bg-black/90 backdrop-blur-md border-t border-white/5">
                     <div className="flex justify-between items-center mb-1.5">
-                      <span className="text-[9px] font-black uppercase tracking-widest text-blue-400">
-                        {completedCount} / {totalChapters} Chapters
-                      </span>
+                      <span className="text-[9px] font-black uppercase tracking-widest text-blue-400">{completedCount} / {totalChapters} Chapters</span>
                       <span className="text-[9px] font-black text-white/40">{progressPercent}%</span>
                     </div>
-                    {/* Progress Bar */}
                     <div className="w-full h-1 bg-white/10 rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-blue-500 transition-all duration-500" 
-                        style={{ width: `${progressPercent}%` }}
-                      />
+                      <div className="h-full bg-blue-500 transition-all duration-500" style={{ width: `${progressPercent}%` }} />
                     </div>
                   </div>
                 </Link>
 
                 <div className="flex justify-between items-start gap-2 px-1">
-                  <h3 className="text-[10px] font-black uppercase truncate text-gray-500 group-hover:text-foreground transition-colors flex-1">
-                    {novel.title}
-                  </h3>
-                  <button 
-                    onClick={() => handleDelete(novel.id)} 
-                    className="text-[9px] font-black text-red-900 hover:text-red-500 transition-colors uppercase pt-0.5"
-                  >
-                    [DEL]
-                  </button>
+                  <h3 className="text-[10px] font-black uppercase truncate text-gray-500 group-hover:text-foreground transition-colors flex-1">{novel.title}</h3>
+                  
+                  
+                  <div className="flex gap-2">
+                    <button onClick={() => handleExport(novel)} className="text-[9px] font-black text-blue-500 hover:text-blue-400 transition-colors uppercase pt-0.5" title="Export Completed Chapters">
+                      [EXP]
+                    </button>
+                    <button onClick={() => handleDelete(novel.id)} className="text-[9px] font-black text-red-900 hover:text-red-500 transition-colors uppercase pt-0.5">
+                      [DEL]
+                    </button>
+                  </div>
                 </div>
               </div>
             );

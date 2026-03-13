@@ -22,6 +22,11 @@
   --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
 }
 
+.v-hl {
+  transition: background-color 0.2s ease;
+  border-radius: 2px;
+  padding: 2px 0;
+}
 
 @layer base {
   body {
