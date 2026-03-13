@@ -11,4 +11,4 @@ Vellum is a translation tool, made to make hand translating much more convenient
   * Highlights the sentence in the source that corresponds to what you are actively translating.
 * Progress Tracking
 * More to Come
->>>>>>> Dev-Web
+
