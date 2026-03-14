@@ -1,16 +1,18 @@
 import { useState, useEffect, useRef } from "react";
 import { db } from "@/lib/db";
 
-export function useTranslation(novelId: number, chapterHref: string | undefined) {
+export function useTranslation(
+  novelId: number, 
+  chapterHref: string | undefined,
+  setActiveSentenceIdx: (idx: number) => void
+) {
   const [translation, setTranslation] = useState("");
-  const [activeSentenceIdx, setActiveSentenceIdx] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
 
   const lastFetchedKey = useRef<string | null>(null);
   const currentHrefRef = useRef<string | undefined>(chapterHref);
 
-  //  Load Content Logic
   useEffect(() => {
     if (!novelId || !chapterHref) return;
     
@@ -30,13 +32,12 @@ export function useTranslation(novelId: number, chapterHref: string | undefined)
       }
     }).catch(err => {
       console.error("DB Load Error:", err);
-      if (isMounted) setIsLoaded(true); // Fail-safe to allow typing
+      if (isMounted) setIsLoaded(true);
     });
     
     return () => { isMounted = false; };
-  }, [novelId, chapterHref]);
+  }, [novelId, chapterHref, setActiveSentenceIdx]);
 
-  //  Auto-save Logic with Href Locking
   useEffect(() => {
     if (!chapterHref || !novelId || !isLoaded || chapterHref !== currentHrefRef.current) {
       return;
@@ -79,12 +80,5 @@ export function useTranslation(novelId: number, chapterHref: string | undefined)
     setActiveSentenceIdx(index);
   };
 
-  return { 
-    translation, 
-    setTranslation, 
-    activeSentenceIdx, 
-    handleCursorMove, 
-    isSaving, 
-    isLoaded 
-  };
+  return { translation, setTranslation, handleCursorMove, isSaving, isLoaded };
 }

@@ -8,13 +8,15 @@ interface EpubOptions {
   hlColor: string;
   hlOpacity: number;
   hlOffset: number;
+  customHighlights?: any[]; 
+  onAddCustomHighlight?: (cfiRange: string, text: string) => void;
 }
 
 export function useEpub(novel: any, viewerRef: MutableRefObject<HTMLDivElement | null>, novelId: number, options: EpubOptions) {
   const [rendition, setRendition] = useState<Rendition | null>(null);
   const [toc, setToc] = useState<any[]>([]);
   const [currentChapter, setCurrentChapter] = useState<{ title: string, href: string } | null>(null);
-
+  const [renderTrigger, setRenderTrigger] = useState(0); 
   
   const hasFileData = !!novel?.fileData;
 
@@ -27,7 +29,6 @@ export function useEpub(novel: any, viewerRef: MutableRefObject<HTMLDivElement |
 
     book.loaded.navigation.then(nav => setToc(nav.toc));
 
-    
     newRendition.on("rendered", (section: unknown, view: any) => {
       requestAnimationFrame(() => {
         const doc = view.document;
@@ -61,6 +62,20 @@ export function useEpub(novel: any, viewerRef: MutableRefObject<HTMLDivElement |
           
           if (n.parentNode) n.parentNode.replaceChild(fragment, n);
         });
+        
+        setRenderTrigger(prev => prev + 1);
+      });
+    });
+
+   
+    newRendition.on("selected", (cfiRange: string, contents: any) => {
+      book.getRange(cfiRange).then(range => {
+        if (!range) { console.warn("EPUB.js could not resolve selection range for:", cfiRange); return;}
+        const text = range.toString().trim();
+        if (text && options.onAddCustomHighlight) {
+          options.onAddCustomHighlight(cfiRange, text);
+        }
+        contents.window.getSelection().removeAllRanges();
       });
     });
 
@@ -72,7 +87,6 @@ export function useEpub(novel: any, viewerRef: MutableRefObject<HTMLDivElement |
       if (href === lastHref) return;
       lastHref = href;
 
-      // Silently update DB in the background
       db.novels.update(novelId, { currentLocation: href }).catch(console.error);
       
       const url = new URL(window.location.href);
@@ -85,7 +99,6 @@ export function useEpub(novel: any, viewerRef: MutableRefObject<HTMLDivElement |
       });
     });
 
-    // Read initial location from URL on first load
     const urlParams = new URLSearchParams(window.location.search);
     const initialLoc = urlParams.get("loc") || novel.currentLocation || undefined;
     newRendition.display(initialLoc);
@@ -95,15 +108,16 @@ export function useEpub(novel: any, viewerRef: MutableRefObject<HTMLDivElement |
     return () => {
       book.destroy();
     };
-  }, [hasFileData, novelId]); 
+  }, [hasFileData, novelId, viewerRef]); 
 
-  // Sync Highlight Effect
+
   useEffect(() => {
-    if (!rendition || !options.hlEnabled) return;
+    if (!rendition || !(rendition as any).manager || !options.hlEnabled) return;
     const targetIdx = Math.max(0, options.activeSentenceIdx + options.hlOffset);
     
     rendition.views().forEach((view: any) => {
       const doc = view.document;
+      if (!doc) return;
       doc.querySelectorAll(".v-hl").forEach((el: any) => el.style.backgroundColor = "transparent");
       
       const targetEl = doc.getElementById(`v-sent-${targetIdx}`);
@@ -113,7 +127,20 @@ export function useEpub(novel: any, viewerRef: MutableRefObject<HTMLDivElement |
         targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
     });
-  }, [options.activeSentenceIdx, options.hlEnabled, options.hlColor, options.hlOpacity, options.hlOffset, rendition]);
+  }, [options.activeSentenceIdx, options.hlEnabled, options.hlColor, options.hlOpacity, options.hlOffset, rendition, renderTrigger]);
+
+  useEffect(() => {
+    if (!rendition || !options.customHighlights) return;
+    
+    // Clear old custom annotations
+    rendition.annotations.remove("highlight", "custom-hl");
+
+    // Apply new ones from DB
+    options.customHighlights.forEach(hl => {
+      rendition.annotations.highlight(hl.cfiRange, {}, (e: any) => {
+      }, "custom-hl", { "fill": hl.color, "fill-opacity": "0.4" });
+    });
+  }, [rendition, options.customHighlights, renderTrigger]);
 
   return { rendition, toc, currentChapter };
 }
