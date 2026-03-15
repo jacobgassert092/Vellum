@@ -8,8 +8,6 @@ interface EpubOptions {
   hlColor: string;
   hlOpacity: number;
   hlOffset: number;
-  customHighlights?: any[]; 
-  onAddCustomHighlight?: (cfiRange: string, text: string) => void;
 }
 
 export function useEpub(novel: any, viewerRef: MutableRefObject<HTMLDivElement | null>, novelId: number, options: EpubOptions) {
@@ -30,8 +28,10 @@ export function useEpub(novel: any, viewerRef: MutableRefObject<HTMLDivElement |
     book.loaded.navigation.then(nav => setToc(nav.toc));
 
     newRendition.on("rendered", (section: unknown, view: any) => {
-      requestAnimationFrame(() => {
+      setTimeout(() => {
         const doc = view.document;
+        if (!doc) return;
+        
         const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT, null);
         let node: Node | null;
         let count = 0;
@@ -49,8 +49,10 @@ export function useEpub(novel: any, viewerRef: MutableRefObject<HTMLDivElement |
             if (i % 2 === 0) {
               if (part.trim()) {
                 const span = doc.createElement("span");
-                span.id = `v-sent-${count++}`;
-                span.className = "v-hl"; 
+                
+                span.setAttribute("data-sent-idx", count++, toString());
+                
+                span.className = "epubjs-hl v-sent-hl"; 
                 span.textContent = part + (arr[i+1] || "");
                 fragment.appendChild(span);
               } else {
@@ -64,19 +66,7 @@ export function useEpub(novel: any, viewerRef: MutableRefObject<HTMLDivElement |
         });
         
         setRenderTrigger(prev => prev + 1);
-      });
-    });
-
-   
-    newRendition.on("selected", (cfiRange: string, contents: any) => {
-      book.getRange(cfiRange).then(range => {
-        if (!range) { console.warn("EPUB.js could not resolve selection range for:", cfiRange); return;}
-        const text = range.toString().trim();
-        if (text && options.onAddCustomHighlight) {
-          options.onAddCustomHighlight(cfiRange, text);
-        }
-        contents.window.getSelection().removeAllRanges();
-      });
+      }, 0);
     });
 
     let lastHref = "";
@@ -110,7 +100,7 @@ export function useEpub(novel: any, viewerRef: MutableRefObject<HTMLDivElement |
     };
   }, [hasFileData, novelId, viewerRef]); 
 
-
+  // Sync Highlight Effect
   useEffect(() => {
     if (!rendition || !(rendition as any).manager || !options.hlEnabled) return;
     const targetIdx = Math.max(0, options.activeSentenceIdx + options.hlOffset);
@@ -118,9 +108,10 @@ export function useEpub(novel: any, viewerRef: MutableRefObject<HTMLDivElement |
     rendition.views().forEach((view: any) => {
       const doc = view.document;
       if (!doc) return;
-      doc.querySelectorAll(".v-hl").forEach((el: any) => el.style.backgroundColor = "transparent");
       
-      const targetEl = doc.getElementById(`v-sent-${targetIdx}`);
+      doc.querySelectorAll(".v-sent-hl").forEach((el: any) => el.style.backgroundColor = "transparent");
+      
+      const targetEl = doc.querySelector(`span[data-sent-idx="${targetIdx}"]`);
       if (targetEl) {
         const hexAlpha = Math.floor(options.hlOpacity * 255).toString(16).padStart(2, '0');
         targetEl.style.backgroundColor = `${options.hlColor}${hexAlpha}`;
@@ -128,19 +119,6 @@ export function useEpub(novel: any, viewerRef: MutableRefObject<HTMLDivElement |
       }
     });
   }, [options.activeSentenceIdx, options.hlEnabled, options.hlColor, options.hlOpacity, options.hlOffset, rendition, renderTrigger]);
-
-  useEffect(() => {
-    if (!rendition || !options.customHighlights) return;
-    
-    // Clear old custom annotations
-    rendition.annotations.remove("highlight", "custom-hl");
-
-    // Apply new ones from DB
-    options.customHighlights.forEach(hl => {
-      rendition.annotations.highlight(hl.cfiRange, {}, (e: any) => {
-      }, "custom-hl", { "fill": hl.color, "fill-opacity": "0.4" });
-    });
-  }, [rendition, options.customHighlights, renderTrigger]);
 
   return { rendition, toc, currentChapter };
 }
