@@ -50,8 +50,9 @@ export default function ReaderClient({ id }: { id: string }) {
     underlineActive: hlOptions.underlineActive,
     underlineColor: hlOptions.underlineColor,
     underlineThickness: hlOptions.underlineThickness,
-    textColor: colors.fg
-  }), [activeSentenceIdx, hlOptions, colors.fg]);
+    textColor: colors.fg,
+    fontSize
+  }), [fontSize, activeSentenceIdx, hlOptions, colors.fg]);
 
   const { rendition, toc, currentChapter } = useEpub(novel, viewerRef, novelId, epubOptions);
   const { translation, setTranslation, handleCursorMove, isLoaded } = useTranslation(novelId, currentChapter?.href, setActiveSentenceIdx);
@@ -122,4 +123,4 @@ export default function ReaderClient({ id }: { id: string }) {
         onMarkPreviousAsComplete={markPreviousAsComplete}
       />
     </div>
-  );
+  )};

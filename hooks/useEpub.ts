@@ -3,6 +3,7 @@ import ePub, { Rendition } from "epubjs";
 import { db } from "@/lib/db";
 
 interface EpubOptions {
+  fontSize: number; // Ensure this is present
   activeSentenceIdx: number;
   hlEnabled: boolean;
   hlColor: string;
@@ -37,13 +38,15 @@ export function useEpub(novel: any, viewerRef: MutableRefObject<HTMLDivElement |
       flow: "scrolled" 
     });
 
-    // Force theme into the iframe
     newRendition.themes.default({
       body: {
         "color": `${options.textColor} !important`,
         "background": "transparent !important"
       }
     });
+    
+    
+    newRendition.themes.fontSize(`${options.fontSize}px`);
 
     book.loaded.navigation.then(nav => setToc(nav.toc));
 
@@ -98,6 +101,13 @@ export function useEpub(novel: any, viewerRef: MutableRefObject<HTMLDivElement |
     
     return () => book.destroy();
   }, [hasFileData, novelId, viewerRef]); 
+
+  
+  useEffect(() => {
+    if (rendition) {
+      rendition.themes.fontSize(`${options.fontSize}px`);
+    }
+  }, [options.fontSize, rendition]);
 
   useEffect(() => {
     if (!rendition || !(rendition as any).manager || !options.hlEnabled) return;
