@@ -93,6 +93,37 @@ export default function ReaderClient({ id }: { id: string }) {
         </div>
 
         <div className="flex-1 flex flex-col relative">
+          
+          {/* WORKSPACE SUB-HEADER / OFFSET CONTROLS */}
+          <div className="py-2 px-4 border-b border-white/10 shrink-0 flex justify-between items-center bg-black/10">
+            <div className="flex items-center gap-3">
+              <span className="text-[8px] opacity-40 font-black uppercase tracking-[0.4em]">Workspace</span>
+              
+              {/* Offset Buttons */}
+              <div className="flex items-center bg-black/40 border border-white/10 rounded overflow-hidden">
+                <span className="text-[8px] uppercase font-bold text-white/50 px-2">Offset</span>
+                <button 
+                  onClick={() => setHlOptions(p => ({ ...p, offset: p.offset - 1 }))} 
+                  className="w-6 h-5 flex items-center justify-center bg-white/5 hover:bg-white/20 border-l border-white/10"
+                >
+                  -
+                </button>
+                <span className="text-[10px] w-5 text-center font-mono font-bold">{hlOptions.offset}</span>
+                <button 
+                  onClick={() => setHlOptions(p => ({ ...p, offset: p.offset + 1 }))} 
+                  className="w-6 h-5 flex items-center justify-center bg-white/5 hover:bg-white/20 border-l border-white/10"
+                >
+                  +
+                </button>
+              </div>
+            </div>
+            
+            {/* Active Sentence Tracking */}
+            <div className="flex items-center gap-4 text-[9px] font-black uppercase tracking-wider text-blue-500">
+              IDX: {activeSentenceIdx}
+            </div>
+          </div>
+
           <textarea 
             id="workspace-area"
             ref={textareaRef}
@@ -123,4 +154,5 @@ export default function ReaderClient({ id }: { id: string }) {
         onMarkPreviousAsComplete={markPreviousAsComplete}
       />
     </div>
-  )};
+  );
+}
